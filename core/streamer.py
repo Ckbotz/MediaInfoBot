@@ -9,7 +9,7 @@ class MediaStreamer:
         self.app.router.add_get("/stream/{chat_id}/{message_id}", self.stream_handler)
         self.runner = None
 
-    async def start(self, host="127.0.0.1", port=8080):
+    async def start(self, host="127.0.0.1", port=8000):
         self.runner = web.AppRunner(self.app)
         await self.runner.setup()
         site = web.TCPSite(self.runner, host, port)
