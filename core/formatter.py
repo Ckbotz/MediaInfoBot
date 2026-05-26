@@ -1,4 +1,4 @@
-#@cantarellabots
+# @cantarellabots
 def format_output(data):
     """
     Parses metadata (from MediaInfo or ffprobe) and returns a formatted string.
@@ -9,19 +9,40 @@ def format_output(data):
         return format_ffprobe(data)
     else:
         return "❌ Could not parse media information."
-#@cantarellabots
+# @cantarellabots
+
 def align(key, value, width=40):
     if not value or value == "N/A":
         return ""
     return f"{key:<{width}} : {value}\n"
 
+
+def get_tag(tags, *keys):
+    """
+    Case-insensitive tag lookup. Tries all provided key variants.
+    e.g. get_tag(tags, "language", "LANGUAGE", "Language")
+    """
+    if not tags:
+        return None
+    for key in keys:
+        # Try exact key
+        val = tags.get(key)
+        if val:
+            return val
+        # Try case-insensitive scan
+        for k, v in tags.items():
+            if k.lower() == key.lower() and v:
+                return v
+    return None
+
+
 def format_mediainfo(data):
     text = ""
     tracks = data["media"].get("track", [])
-    
+
     for track in tracks:
         ttype = track.get("@type")
-        
+
         if ttype == "General":
             text += "🗒 **General**\n"
             text += align("Unique ID", track.get("UniqueID"))
@@ -61,7 +82,7 @@ def format_mediainfo(data):
 
         elif ttype == "Audio":
             idx = track.get("StreamOrder", "1")
-            text += f"🔊 **Audio #{int(idx)+1}**\n"
+            text += f"🔊 **Audio #{int(idx) + 1}**\n"
             text += align("ID", track.get("ID"))
             text += align("Format", track.get("Format"))
             text += align("Codec ID", track.get("CodecID"))
@@ -69,7 +90,9 @@ def format_mediainfo(data):
             text += align("Channel(s)", f"{track.get('Channels')} channels")
             text += align("Channel layout", track.get("ChannelLayout"))
             text += align("Sampling rate", track.get("SamplingRate_String"))
-            text += align("Language", track.get("Language_String"))
+            # Try both MediaInfo key variants
+            lang = track.get("Language_String") or track.get("Language") or track.get("language")
+            text += align("Language", lang)
             text += align("Title", track.get("Title"))
             text += align("Default", track.get("Default"))
             text += align("Forced", track.get("Forced"))
@@ -77,11 +100,13 @@ def format_mediainfo(data):
 
         elif ttype == "Text":
             idx = track.get("StreamOrder", "1")
-            text += f"🔠 **Subtitle #{int(idx)+1}**\n"
+            text += f"🔠 **Subtitle #{int(idx) + 1}**\n"
             text += align("ID", track.get("ID"))
             text += align("Format", track.get("Format"))
             text += align("Codec ID", track.get("CodecID"))
-            text += align("Language", track.get("Language_String"))
+            # Try both MediaInfo key variants
+            lang = track.get("Language_String") or track.get("Language") or track.get("language")
+            text += align("Language", lang)
             text += align("Title", track.get("Title"))
             text += align("Default", track.get("Default"))
             text += align("Forced", track.get("Forced"))
@@ -89,25 +114,29 @@ def format_mediainfo(data):
 
     return f"```\n{text.strip()}\n```"
 
+
 def format_ffprobe(data):
-    # FFprobe fallback - simplified but still detailed
     text = ""
     fmt = data.get("format", {})
     streams = data.get("streams", [])
-    
+
     text += "🗒 **General**\n"
     text += align("Format", fmt.get("format_long_name"))
     size = int(fmt.get("size", 0))
-    text += align("File size", f"{size / (1024*1024):.2f} MB")
+    text += align("File size", f"{size / (1024 * 1024):.2f} MB")
     dur = float(fmt.get("duration", 0))
-    text += align("Duration", f"{dur/60:.2f} min")
-    text += align("Bit rate", f"{int(fmt.get('bit_rate', 0))/1000:.1f} kbps")
+    text += align("Duration", f"{dur / 60:.2f} min")
+    text += align("Bit rate", f"{int(fmt.get('bit_rate', 0)) / 1000:.1f} kbps")
     text += "\n"
-    
+
     for i, s in enumerate(streams):
         stype = s.get("codec_type")
-        tags = s.get("tags", {})
-        
+        tags = s.get("tags") or {}
+
+        # Case-insensitive language and title lookup
+        lang = get_tag(tags, "language", "LANGUAGE", "Language")
+        title = get_tag(tags, "title", "TITLE", "Title")
+
         if stype == "video":
             text += "🎞 **Video**\n"
             text += align("Codec", s.get("codec_name"))
@@ -115,18 +144,20 @@ def format_ffprobe(data):
             text += align("Frame rate", s.get("avg_frame_rate"))
             text += align("Bit depth", f"{s.get('bits_per_raw_sample')} bits")
             text += "\n"
+
         elif stype == "audio":
             text += f"🔊 **Audio #{i}**\n"
             text += align("Codec", s.get("codec_name"))
             text += align("Channels", s.get("channels"))
-            text += align("Language", tags.get("language"))
-            text += align("Title", tags.get("title"))
+            text += align("Language", lang)
+            text += align("Title", title)
             text += "\n"
+
         elif stype == "subtitle":
             text += f"🔠 **Subtitle #{i}**\n"
             text += align("Codec", s.get("codec_name"))
-            text += align("Language", tags.get("language"))
-            text += align("Title", tags.get("title"))
+            text += align("Language", lang)
+            text += align("Title", title)
             text += "\n"
-            
+
     return f"```\n{text.strip()}\n```"
