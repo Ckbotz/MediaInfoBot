@@ -1,7 +1,9 @@
 import asyncio
 import json
 import shutil
-#@cantarellabots
+import logging
+# @cantarellabots
+
 async def extract_mediainfo(url):
     """
     Runs mediainfo or ffprobe on the remote URL to extract metadata.
@@ -10,20 +12,21 @@ async def extract_mediainfo(url):
     if shutil.which("mediainfo"):
         cmd = ["mediainfo", "--Output=JSON", url]
         return await run_command(cmd)
-    
+
     # Fallback to ffprobe
     if shutil.which("ffprobe"):
         cmd = [
-            "ffprobe", 
-            "-v", "quiet", 
-            "-print_format", "json", 
-            "-show_format", 
-            "-show_streams", 
+            "ffprobe",
+            "-v", "quiet",
+            "-print_format", "json",
+            "-show_format",
+            "-show_streams",
             url
         ]
         return await run_command(cmd)
-    
+
     raise Exception("Neither 'mediainfo' nor 'ffprobe' was found on the system.")
+
 
 async def run_command(cmd):
     process = await asyncio.create_subprocess_exec(
@@ -31,11 +34,16 @@ async def run_command(cmd):
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE
     )
-    
+
     stdout, stderr = await process.communicate()
-    
+
     if process.returncode != 0:
         error_msg = stderr.decode().strip() or "Unknown error"
         raise Exception(f"Command error: {error_msg}")
-        
-    return json.loads(stdout.decode())
+
+    data = json.loads(stdout.decode())
+
+    # DEBUG: Log raw metadata to see exact tag keys
+    logging.info(f"RAW METADATA:\n{json.dumps(data, indent=2)}")
+
+    return data
