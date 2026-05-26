@@ -1,4 +1,5 @@
 #@cantarellabots
+#
 def format_output(data):
     """
     Parses metadata (from MediaInfo or ffprobe) and returns a formatted string.
